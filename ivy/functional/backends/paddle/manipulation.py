@@ -446,3 +446,15 @@ def unstack(
     if keepdims:
         return [paddle_backend.expand_dims(r, axis=axis) for r in ret]
     return ret
+
+def moveaxis(
+    x: paddle.Tensor,
+    source: Union[int, Sequence[int]],
+    destination: Union[int, Sequence[int]],
+    *,
+    out: Optional[paddle.Tensor] = None,
+) -> paddle.Tensor:
+    if source == destination:
+        return x
+    else:
+        return paddle.transpose(x, list(range(x.ndim - len(source))) + list(destination))

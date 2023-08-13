@@ -446,3 +446,42 @@ def unstack(
     if keepdims:
         return [paddle_backend.expand_dims(r, axis=axis) for r in ret]
     return ret
+
+def moveaxis(
+    x: paddle.Tensor,
+    source: int,
+    destination: int,
+    /,
+    *,
+    out: Optional[paddle.Tensor] = None,
+) -> paddle.Tensor:
+    """
+    Move axes of an array to new positions.
+    Other axes remain in their original order.
+
+    Parameters
+    ----------
+    x : paddle.Tensor
+        The input tensor.
+    source : int
+        The original position of the axes to move. These must be unique.
+    destination : int
+        The destination position for each of the original axes. These must also be unique.
+
+    Returns
+    -------
+    result : paddle.Tensor
+        Array with moved axes. This array is a view of the input array.
+    """
+    if source == destination:
+        return x
+    if source < 0:
+        source = x.ndim + source
+    if destination < 0:
+        destination = x.ndim + destination
+    if source < 0 or source >= x.ndim or destination < 0 or destination >= x.ndim:
+        raise ValueError("Source or destination axis out of range")
+    order = list(range(x.ndim))
+    order.pop(source)
+    order.insert(destination, source)
+    return paddle.transpose(x, order)

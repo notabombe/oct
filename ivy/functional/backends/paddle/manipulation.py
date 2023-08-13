@@ -454,7 +454,21 @@ def moveaxis(
     *,
     out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
+    if isinstance(source, int):
+        source = [source]
+    if isinstance(destination, int):
+        destination = [destination]
+    if not all(s < x.ndim for s in source) or not all(d < x.ndim for d in destination):
+        raise ValueError("source and destination must be valid axes for the input tensor")
+    if len(source) != len(destination):
+        raise ValueError("source and destination must have the same length")
     if source == destination:
-        return x
+        result = x
     else:
-        return paddle.transpose(x, list(range(x.ndim - len(source))) + list(destination))
+        result = paddle.transpose(x, list(range(x.ndim - len(source))) + list(destination))
+    if result.shape != x.shape:
+        raise ValueError("transpose operation was not successful")
+    if out is not None:
+        out = result
+        return out
+    return result

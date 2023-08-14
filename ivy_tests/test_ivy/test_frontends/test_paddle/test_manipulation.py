@@ -1,3 +1,5 @@
+import numpy as np
+import numpy as np
 import pytest
 from ivy.functional.frontends.paddle.tensor.manipulation import moveaxis
 
@@ -10,5 +12,5 @@ def test_moveaxis(x, source, destination, expected):
     """
     Test the moveaxis function with different inputs.
     """
-    asser
+    assert np.array_equal(moveaxis(x, source, destination), expected)
 

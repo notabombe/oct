@@ -598,9 +598,6 @@ def moveaxis(
     source: Union[int, Sequence[int]],
     destination: Union[int, Sequence[int]],
     /,
-    *,
-    copy: Optional[bool] = None,
-    out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
     if isinstance(source, tuple):
         source = list(source)

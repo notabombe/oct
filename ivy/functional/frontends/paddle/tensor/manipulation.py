@@ -96,3 +96,7 @@ def cast(x, dtype):
 @to_ivy_arrays_and_back
 def broadcast_to(x, shape, name=None):
     return ivy.broadcast_to(x, shape)
+
+@to_ivy_arrays_and_back
+def moveaxis(x, source, destination):
+    return ivy.moveaxis(x, source, destination)

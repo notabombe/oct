@@ -592,3 +592,17 @@ def unique_consecutive(
         inverse_indices,
         counts,
     )
+
+def moveaxis(
+    a: paddle.Tensor,
+    source: Union[int, Sequence[int]],
+    destination: Union[int, Sequence[int]],
+    /,
+) -> paddle.Tensor:
+    if isinstance(source, tuple):
+        source = list(source)
+    if isinstance(destination, tuple):
+        destination = list(destination)
+    if a.dtype in [paddle.int8, paddle.int16, paddle.uint8]:
+        return paddle.transpose(a.cast("float32"), source, destination).cast(a.dtype)
+    return paddle.transpose(a, source, destination)

@@ -44,29 +44,25 @@ def arange(
         stop = start
         start = 0
     if (step > 0 and start > stop) or (step < 0 and start < stop):
-        if isinstance(stop, float):
-            stop = float(start)
-        else:
-            stop = start
-    if dtype is None:
-        if isinstance(start, int) and isinstance(stop, int) and isinstance(step, int):
-            return to_device(
-                paddle.arange(start, stop, step, dtype=paddle.int32), device
-            )
-
-        elif (
-            isinstance(start, float)
-            or isinstance(stop, float)
-            or isinstance(step, float)
-        ):
-            return to_device(
-                paddle.arange(start, stop, step, dtype=paddle.float32), device
-            )
-
-        else:
-            return to_device(paddle.arange(start, stop, step), device)
-    else:
+        stop = float(start) if isinstance(stop, float) else start
+    if dtype is not None:
         return to_device(paddle.arange(start, stop, step).cast(dtype), device)
+    if isinstance(start, int) and isinstance(stop, int) and isinstance(step, int):
+        return to_device(
+            paddle.arange(start, stop, step, dtype=paddle.int32), device
+        )
+
+    elif (
+        isinstance(start, float)
+        or isinstance(stop, float)
+        or isinstance(step, float)
+    ):
+        return to_device(
+            paddle.arange(start, stop, step, dtype=paddle.float32), device
+        )
+
+    else:
+        return to_device(paddle.arange(start, stop, step), device)
 
 
 @asarray_to_native_arrays_and_back
@@ -259,9 +255,7 @@ def _linspace_helper(start, stop, num, axis=None, *, dtype=None):
         stop_shape = stop.shape
         sos_shape = stop_shape
         if num == 1:
-            return (
-                paddle_backend.ones(stop_shape[:axis] + [1] + stop_shape[axis:]) * start
-            )
+            return paddle_backend.ones(sos_shape[:axis] + [1] + sos_shape[axis:]) * start
         stop = stop.reshape((-1,))
         linspace_method = (
             _differentiable_linspace if not stop.stop_gradient else paddle.linspace
@@ -283,7 +277,7 @@ def _linspace_helper(start, stop, num, axis=None, *, dtype=None):
                     paddle_backend.unstack(stop, keepdims=True),
                 )
             ]
-    elif start_is_array and not stop_is_array:
+    elif start_is_array:
         if num < start.shape[0]:
             start = paddle_backend.expand_dims(start, axis=axis)
             diff = stop - start
@@ -293,7 +287,7 @@ def _linspace_helper(start, stop, num, axis=None, *, dtype=None):
             res.append(paddle.ones(start.shape).astype(start.dtype) * stop)
         else:
             res = [linspace_method(strt, stop, num) for strt in start]
-    elif not start_is_array and stop_is_array:
+    elif stop_is_array:
         if num < stop.shape[0]:
             stop = paddle_backend.expand_dims(stop, axis=-1)
             diff = stop - start
@@ -360,18 +354,18 @@ def linspace(
     if axis is None:
         axis = -1
     if not endpoint:
-        if dtype is not None:
-            ans = _linspace_helper(start, stop, num + 1, axis, dtype=dtype)
-        else:
-            ans = _linspace_helper(start, stop, num + 1, axis)
+        ans = (
+            _linspace_helper(start, stop, num + 1, axis, dtype=dtype)
+            if dtype is not None
+            else _linspace_helper(start, stop, num + 1, axis)
+        )
         if axis < 0:
             axis += len(ans.shape)
         ans = paddle_backend.get_item(ans, _slice_at_axis(slice(None, -1), axis))
+    elif dtype is not None:
+        ans = _linspace_helper(start, stop, num, axis, dtype=dtype)
     else:
-        if dtype is not None:
-            ans = _linspace_helper(start, stop, num, axis, dtype=dtype)
-        else:
-            ans = _linspace_helper(start, stop, num, axis)
+        ans = _linspace_helper(start, stop, num, axis)
     if (
         endpoint
         and ans.shape[0] > 1
@@ -534,9 +528,7 @@ def copy_array(
     to_ivy_array: Optional[bool] = True,
     out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
-    if to_ivy_array:
-        return ivy.to_ivy(x.clone())
-    return x.clone()
+    return ivy.to_ivy(x.clone()) if to_ivy_array else x.clone()
 
 
 def one_hot(
@@ -560,11 +552,10 @@ def one_hot(
     if dtype is None:
         if on_none and off_none:
             dtype = paddle.float32
+        elif on_none:
+            dtype = paddle.to_tensor(off_value).dtype
         else:
-            if not on_none:
-                dtype = paddle.to_tensor(on_value).dtype
-            elif not off_none:
-                dtype = paddle.to_tensor(off_value).dtype
+            dtype = paddle.to_tensor(on_value).dtype
     else:
         dtype = ivy.as_native_dtype(dtype)
 
@@ -622,10 +613,7 @@ def frombuffer(
         ret = ret + list(x)
     if offset > 0:
         offset = int(offset / dtype_bytes)
-    if count > -1:
-        ret = ret[offset : offset + count]
-    else:
-        ret = ret[offset:]
+    ret = ret[offset : offset + count] if count > -1 else ret[offset:]
     ret = paddle.to_tensor(ret, dtype=dtype)
 
     return ret

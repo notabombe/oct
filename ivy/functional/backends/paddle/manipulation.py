@@ -27,7 +27,7 @@ def concat(
 ) -> paddle.Tensor:
     dtypes_list = list(set(map(lambda x: x.dtype, xs)))
     dtype = dtypes_list.pop()
-    if len(dtypes_list) > 0:
+    if dtypes_list:
         for d in dtypes_list:
             dtype = ivy.promote_types(dtype, d)
     if dtype == paddle.int16:
@@ -116,26 +116,14 @@ def reshape(
         newarr = paddle.clone(x)
         if order == "F":
             ret = _reshape_fortran_paddle(newarr, shape)
-            if out_scalar:
-                return paddle_backend.squeeze(ret, axis=0)
-
-            return ret
+            return paddle_backend.squeeze(ret, axis=0) if out_scalar else ret
         ret = paddle.reshape(newarr, shape)
-        if out_scalar:
-            return paddle_backend.squeeze(ret, axis=0)
-
-        return ret
+        return paddle_backend.squeeze(ret, axis=0) if out_scalar else ret
     if order == "F":
         ret = _reshape_fortran_paddle(x, shape)
-        if out_scalar:
-            return paddle_backend.squeeze(ret, axis=0)
-
-        return ret
+        return paddle_backend.squeeze(ret, axis=0) if out_scalar else ret
     ret = paddle.reshape(x, shape)
-    if out_scalar:
-        return paddle_backend.squeeze(ret, axis=0)
-
-    return ret
+    return paddle_backend.squeeze(ret, axis=0) if out_scalar else ret
 
 
 def roll(
@@ -171,7 +159,7 @@ def squeeze(
         if axis is None or axis == 0 or axis == -1:
             return x
         raise ivy.utils.exceptions.IvyException(
-            "tried to squeeze a zero-dimensional input by axis {}".format(axis)
+            f"tried to squeeze a zero-dimensional input by axis {axis}"
         )
     if x.ndim > 6:
         # Paddle squeeze sets a maximum limit of 6 dims in the input
@@ -196,7 +184,7 @@ def stack(
 ) -> paddle.Tensor:
     dtype_list = set(map(lambda x: x.dtype, arrays))
     dtype = dtype_list.pop()
-    if len(dtype_list) > 0:
+    if dtype_list:
         for d in dtype_list:
             dtype = ivy.promote_types(dtype, d)
 
@@ -236,9 +224,7 @@ def split(
     if x.shape == ():
         if num_or_size_splits is not None and num_or_size_splits != 1:
             raise ivy.utils.exceptions.IvyException(
-                "input array had no shape, but num_sections specified was {}".format(
-                    num_or_size_splits
-                )
+                f"input array had no shape, but num_sections specified was {num_or_size_splits}"
             )
         return [x]
     if num_or_size_splits is None:
@@ -284,22 +270,20 @@ def repeat(
     axis: int = None,
     out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
-    # handle the case when repeats contains 0 as paddle doesn't support it
     if (isinstance(repeats, Number) and repeats == 0) or (
         isinstance(repeats, paddle.Tensor) and repeats.size == 1 and repeats.item() == 0
     ):
         if axis is None:
             return paddle.to_tensor([], dtype=x.dtype)
-        else:
-            shape = x.shape
-            shape[axis] = 0
-            return paddle.zeros(shape=shape).cast(x.dtype)
+        shape = x.shape
+        shape[axis] = 0
+        return paddle.zeros(shape=shape).cast(x.dtype)
 
     if isinstance(repeats, paddle.Tensor) and repeats.size == 1:
         repeats = repeats.item()
 
     if axis is not None:
-        axis = axis % x.ndim
+        axis %= x.ndim
     if x.dtype in [
         paddle.int8,
         paddle.int16,
@@ -361,8 +345,7 @@ def constant_pad(
         if len(item) != 2:
             raise ivy.utils.exceptions.IvyException("Length of each item should be 2")
         else:
-            paddings.append(item[0])
-            paddings.append(item[1])
+            paddings.extend((item[0], item[1]))
     if x.dtype in [
         paddle.int8,
         paddle.int16,
@@ -395,7 +378,7 @@ def swapaxes(
     copy: Optional[bool] = None,
     out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
-    axes = [x for x in range(x.ndim)]
+    axes = list(range(x.ndim))
     axes[axis0], axes[axis1] = axes[axis1], axes[axis0]
     return paddle_backend.permute_dims(x, axes)
 
@@ -422,7 +405,7 @@ def unstack(
     if x.ndim == 0:
         return [x]
     if axis is not None:
-        axis = axis % x.ndim
+        axis %= x.ndim
     else:
         axis = 0
     if x.dtype in [

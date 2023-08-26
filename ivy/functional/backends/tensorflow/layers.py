@@ -136,9 +136,7 @@ def conv2d(
         x = tf.transpose(x, (0, 2, 3, 1))
     x = _pad_before_conv(x, filters, strides, padding, 2, dilations)
     res = tf.nn.conv2d(x, filters, strides, "VALID", "NHWC", dilations)
-    if data_format == "NCHW":
-        return tf.transpose(res, (0, 3, 1, 2))
-    return res
+    return tf.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 @with_unsupported_dtypes({"2.13.0 and below": ("bfloat16", "complex")}, backend_version)
@@ -169,9 +167,7 @@ def conv2d_transpose(
     res = tf.nn.conv2d_transpose(
         x, filters, output_shape, strides, padding, "NHWC", dilations
     )
-    if data_format == "NCHW":
-        return tf.transpose(res, (0, 3, 1, 2))
-    return res
+    return tf.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 @with_unsupported_dtypes({"2.13.0 and below": ("bfloat16", "complex")}, backend_version)
@@ -195,9 +191,7 @@ def depthwise_conv2d(
     x = _pad_before_conv(x, filters, strides, padding, 2, dilations)
     strides = [1, strides[0], strides[1], 1]
     res = tf.nn.depthwise_conv2d(x, filters, strides, "VALID", "NHWC", dilations)
-    if data_format == "NCHW":
-        return tf.transpose(res, (0, 3, 1, 2))
-    return res
+    return tf.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 @with_unsupported_dtypes({"2.13.0 and below": ("bfloat16", "complex")}, backend_version)
@@ -220,9 +214,7 @@ def conv3d(
         [1] + ([dilations] * 3 if isinstance(dilations, int) else dilations) + [1]
     )
     res = tf.nn.conv3d(x, filters, strides, "VALID", "NDHWC", dilations)
-    if data_format == "NCDHW":
-        return tf.transpose(res, (0, 4, 1, 2, 3))
-    return res
+    return tf.transpose(res, (0, 4, 1, 2, 3)) if data_format == "NCDHW" else res
 
 
 @with_unsupported_dtypes({"2.13.0 and below": ("bfloat16", "complex")}, backend_version)
@@ -257,9 +249,7 @@ def conv3d_transpose(
     res = tf.nn.conv3d_transpose(
         x, filters, output_shape, strides, padding, "NDHWC", dilations
     )
-    if data_format == "NCDHW":
-        return tf.transpose(res, (0, 4, 1, 2, 3))
-    return res
+    return tf.transpose(res, (0, 4, 1, 2, 3)) if data_format == "NCDHW" else res
 
 
 @with_unsupported_dtypes({"2.13.0 and below": ("bfloat16", "complex")}, backend_version)
@@ -338,8 +328,8 @@ def conv_general_dilated(
         # grouped conv3d is not supported on CPU
         # ToDO: change the condition of GPU when automatic device shifting
         #  is implemented in ivy
-        if feature_group_count == 1 or tf.test.is_gpu_available():
-            res = tf.nn.conv3d(
+        res = (
+            tf.nn.conv3d(
                 x,
                 filters,
                 strides,
@@ -347,13 +337,17 @@ def conv_general_dilated(
                 df,
                 dilations,
             )
-        else:
-            res = tf.concat(
+            if feature_group_count == 1 or tf.test.is_gpu_available()
+            else tf.concat(
                 [
                     tf.nn.conv3d(
                         x[:, :, :, :, i : i + filters.shape[-2]],
                         filters[
-                            :, :, :, :, j : j + filters.shape[-1] // feature_group_count
+                            :,
+                            :,
+                            :,
+                            :,
+                            j : j + filters.shape[-1] // feature_group_count,
                         ],
                         strides,
                         "VALID",
@@ -371,6 +365,7 @@ def conv_general_dilated(
                 ],
                 axis=-1,
             )
+        )
     res = tf.math.add(res, bias) if bias is not None else res
     if data_format == "channel_first":
         res = tf.transpose(res, (0, dims + 1, *range(1, dims + 1)))

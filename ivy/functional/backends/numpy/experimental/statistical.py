@@ -57,8 +57,8 @@ def histogram(
         a_along_axis_1d = (
             a.transpose(inverted_shape_dims).flatten().reshape((-1, shape_axes))
         )
+        ret = []
         if weights is None:
-            ret = []
             for a_1d in a_along_axis_1d:
                 ret_1d = np.histogram(
                     a_1d,
@@ -74,7 +74,6 @@ def histogram(
                 .flatten()
                 .reshape((-1, shape_axes))
             )
-            ret = []
             for a_1d, weights_1d in zip(a_along_axis_1d, weights_along_axis_1d):
                 ret_1d = np.histogram(
                     a_1d,
@@ -299,7 +298,7 @@ def cummax(
             x = np.swapaxes(x, axis, -1)
             indices = __find_cummax_indices(x, axis=axis)
             res = np.maximum.accumulate(x, axis=axis, dtype=x.dtype)
-        elif reverse:
+        else:
             x = np.flip(x, axis=axis)
             indices = __find_cummax_indices(x, axis=axis)
             x = np.maximum.accumulate(x, axis=axis)
@@ -377,11 +376,10 @@ def cummin(
             dtype = ivy.default_int_dtype(as_native=True)
         else:
             dtype = _infer_dtype(x.dtype)
-    if not (reverse):
+    if not reverse:
         return np.minimum.accumulate(x, axis, dtype=dtype, out=out)
-    elif reverse:
-        x = np.minimum.accumulate(np.flip(x, axis=axis), axis=axis, dtype=dtype)
-        return np.flip(x, axis=axis)
+    x = np.minimum.accumulate(np.flip(x, axis=axis), axis=axis, dtype=dtype)
+    return np.flip(x, axis=axis)
 
 
 def igamma(

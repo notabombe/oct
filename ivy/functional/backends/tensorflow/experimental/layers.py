@@ -112,9 +112,9 @@ def max_pool2d(
                 (pad_w // 2, pad_w - pad_w // 2),
             ]
 
-        x_shape = x.shape[1:-1]
-
         if ceil_mode:
+            x_shape = x.shape[1:-1]
+
             for i in range(2):
                 padding[i] = _padding_ceil_mode(
                     x_shape[i], new_kernel[i], padding[i], strides[i]
@@ -127,9 +127,7 @@ def max_pool2d(
         res = tf.transpose(res, (0, 2, 3, 1))
     # converting minimum value to -inf because tensorflow clips -inf to minimum value
     res = tf.where(res <= ivy.finfo(res.dtype).min, -math.inf, res)
-    if data_format == "NCHW":
-        return tf.transpose(res, (0, 3, 1, 2))
-    return res
+    return tf.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 @with_unsupported_dtypes(
@@ -148,9 +146,7 @@ def max_pool3d(
     if data_format == "NCDHW":
         x = tf.transpose(x, (0, 2, 3, 4, 1))
     res = tf.nn.max_pool3d(x, kernel, strides, padding)
-    if data_format == "NCDHW":
-        return tf.transpose(res, (0, 4, 1, 2, 3))
-    return res
+    return tf.transpose(res, (0, 4, 1, 2, 3)) if data_format == "NCDHW" else res
 
 
 def _handle_manual_pad_avg_pool(x, kernel, strides, padding, ceil_mode, dims):
@@ -334,9 +330,7 @@ def avg_pool2d(
         kernel_mul = tf.cast(tf.math.reduce_prod(kernel), res.dtype)
         res = (kernel_mul * res) / (kernel_mul - tf.expand_dims(num_padded_values, -1))
 
-    if data_format == "NCHW":
-        return tf.transpose(res, (0, 3, 1, 2))
-    return res
+    return tf.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 @with_unsupported_dtypes(
@@ -439,9 +433,7 @@ def avg_pool3d(
         kernel_mul = tf.cast(tf.math.reduce_prod(kernel), res.dtype)
         res = (kernel_mul * res) / (kernel_mul - tf.expand_dims(num_padded_values, -1))
 
-    if data_format == "NCDHW":
-        return tf.transpose(res, (0, 4, 1, 2, 3))
-    return res
+    return tf.transpose(res, (0, 4, 1, 2, 3)) if data_format == "NCDHW" else res
 
 
 @with_unsupported_dtypes(
@@ -574,7 +566,7 @@ def fft(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {n}, expecting more than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm not in ["backward", "ortho", "forward"]:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
     x = tf.cast(x, tf.complex128)
     if x.shape[dim] != n:
@@ -591,7 +583,7 @@ def fft(
         del s
     operation_name = f"{n} points FFT at dim {dim} with {norm} normalization"
     if dim != -1 or dim != len(x.shape) - 1:
-        permute = [i for i in range(len(x.shape))]
+        permute = list(range(len(x.shape)))
         permute[dim], permute[-1] = permute[-1], permute[dim]
         x = tf.transpose(x, permute)
         ret = tf.signal.fft(x, operation_name)
@@ -631,8 +623,8 @@ def dropout1d(
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
     if training:
-        is_batched = len(x.shape) == 3
         if data_format == "NCW":
+            is_batched = len(x.shape) == 3
             perm = (0, 2, 1) if is_batched else (1, 0)
             x = tf.transpose(x, perm)
         res = tf.nn.dropout(x, prob)
@@ -716,7 +708,7 @@ def ifft(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {n}, expecting more than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm not in ["backward", "ortho", "forward"]:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
     if x.shape[dim] != n:
         s = list(x.shape)
@@ -732,7 +724,7 @@ def ifft(
         del s
     operation_name = f"{n} points FFT at dim {dim} with {norm} normalization"
     if dim != -1 or dim != len(x.shape) - 1:
-        permute = [i for i in range(len(x.shape))]
+        permute = list(range(len(x.shape)))
         permute[dim], permute[-1] = permute[-1], permute[dim]
         x = tf.transpose(x, permute)
         ret = tf.signal.ifft(x, operation_name)
@@ -814,8 +806,9 @@ def interpolate(
     return ret
 
 
-interpolate.partial_mixed_handler = lambda x, *args, mode="linear", scale_factor=None, recompute_scale_factor=None, align_corners=None, **kwargs: (  # noqa: E501
-    (not align_corners and (len(x.shape) - 2) < 2)
+interpolate.partial_mixed_handler = (
+    lambda x, *args, mode="linear", scale_factor=None, recompute_scale_factor=None, align_corners=None, **kwargs: not align_corners
+    and len(x.shape) < 4
     and mode not in ["nearest", "area", "bicubic", "nd"]
 )
 
@@ -846,7 +839,7 @@ def trans_x_to_s(
     if x.dtype != tf.complex128 or x.dtype != tf.complex64:
         x = tf.cast(x, tf.float32)
     x_shape = x.shape
-    if dim == (-1, -2) or dim == (1, 0):
+    if dim in [(-1, -2), (1, 0)]:
         s = (s[1], s[0])
     if s[0] >= x_shape[0] and s[1] >= x_shape[1]:
         paddings = tf.constant([[0, s[0] - x_shape[0]], [0, s[1] - x_shape[1]]])
@@ -861,7 +854,7 @@ def trans_x_to_s(
             size = s[1] - x_new.shape[1]
             z = tf.zeros((s[0], size))
             x_new = tf.concat([x_new, z], 1)
-    elif (s[0] >= x_shape[0] and s[1] <= x_shape[1]) and min(s) <= min(x_shape):
+    elif s[0] >= x_shape[0] and s[1] <= x_shape[1]:
         x_new = x[: s[0], : s[1]]
         size = s[0] - x_new.shape[0]
         z = tf.zeros((size, s[1]))
@@ -899,7 +892,7 @@ def fft2(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {s}, expecting s points larger than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm not in ["backward", "ortho", "forward"]:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
     operation_name = f"{s} points FFT at dim {dim} with {norm} normalization"
     if len(x.shape) == 2:
@@ -921,9 +914,7 @@ def fft2(
 def fft_input_validation(x):
     if not x.dtype.is_complex:
         raise TypeError(
-            "Invalid FFT input: `x` must be of a complex dtype. Received: {}".format(
-                x.dtype
-            )
+            f"Invalid FFT input: `x` must be of a complex dtype. Received: {x.dtype}"
         )
     return x
 
@@ -935,10 +926,7 @@ def shape_and_axes_validation(shape, axes, input_rank_tensor):
             tf.debugging.assert_less_equal(
                 tf.size(shape),
                 input_rank_tensor,
-                message=(
-                    "Argument `shape` cannot have length greater than the rank of `x`. "
-                    "Received: {}"
-                ).format(shape),
+                message=f"Argument `shape` cannot have length greater than the rank of `x`. Received: {shape}",
             )
         ]
         with tf.control_dependencies(checks_shape):
@@ -950,24 +938,17 @@ def shape_and_axes_validation(shape, axes, input_rank_tensor):
             tf.debugging.assert_less_equal(
                 tf.size(axes),
                 input_rank_tensor,
-                message=(
-                    "Argument `axes` cannot have length greater than the rank of `x`. "
-                    "Received: {}"
-                ).format(axes),
+                message=f"Argument `axes` cannot have length greater than the rank of `x`. Received: {axes}",
             ),
             tf.debugging.assert_less(
                 axes,
                 input_rank_tensor,
-                message=(
-                    "Argument `axes` contains invalid indices. Received: {}"
-                ).format(axes),
+                message=f"Argument `axes` contains invalid indices. Received: {axes}",
             ),
             tf.debugging.assert_greater_equal(
                 axes,
                 -input_rank_tensor,
-                message=(
-                    "Argument `axes` contains invalid indices. Received: {}"
-                ).format(axes),
+                message=f"Argument `axes` contains invalid indices. Received: {axes}",
             ),
         ]
         with tf.control_dependencies(checks_axes):
@@ -978,10 +959,7 @@ def shape_and_axes_validation(shape, axes, input_rank_tensor):
             tf.debugging.assert_equal(
                 tf.size(shape),
                 tf.size(axes),
-                message=(
-                    "Arguments `shape` and `axes` must have equal length. "
-                    "Received: {}, {}"
-                ).format(shape, axes),
+                message=f"Arguments `shape` and `axes` must have equal length. Received: {shape}, {axes}",
             )
         ]
         with tf.control_dependencies(checks_shape_axes):
@@ -1036,7 +1014,7 @@ def rank_initialization(axes):
 def norm_initialization(norm, shape, x):
     if norm == "backward":
         norm_factor = tf.constant(1, x.dtype)
-    elif norm == "forward" or norm == "ortho":
+    elif norm in ["forward", "ortho"]:
         norm_factor = tf.cast(tf.math.reduce_prod(shape), x.dtype)
         if norm == "ortho":
             norm_factor = tf.math.sqrt(norm_factor)
@@ -1055,7 +1033,7 @@ def get_x_after_pad_or_crop(x, shape, axes, perform_padding, input_rank_tensor):
 
 def get_perm(input_rank_tensor, axes):
     all_dims = tf.range(input_rank_tensor, dtype=tf.dtypes.int32)
-    perm = tf.concat(
+    return tf.concat(
         [
             tf.boolean_mask(
                 all_dims,
@@ -1071,7 +1049,6 @@ def get_perm(input_rank_tensor, axes):
         ],
         0,
     )
-    return perm
 
 
 def ifft_operations(x, rank, norm_factor):
@@ -1181,8 +1158,7 @@ def ifftn(
 ) -> Union[tf.Tensor, tf.Variable]:
     result = _ifftn_helper(x, s, axes, norm)
 
-    if out is not None:
-        out = result
-        return out
-    else:
+    if out is None:
         return result
+    out = result
+    return out

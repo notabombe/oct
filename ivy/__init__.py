@@ -77,12 +77,12 @@ class Array:
 class Device(str):
     def __new__(cls, dev_str):
         if dev_str != "":
-            ivy.utils.assertions.check_elem_in_list(dev_str[0:3], ["gpu", "tpu", "cpu"])
+            ivy.utils.assertions.check_elem_in_list(dev_str[:3], ["gpu", "tpu", "cpu"])
             if dev_str != "cpu":
                 # ivy.assertions.check_equal(dev_str[3], ":")
                 ivy.utils.assertions.check_true(
                     dev_str[4:].isnumeric(),
-                    message="{} must be numeric".format(dev_str[4:]),
+                    message=f"{dev_str[4:]} must be numeric",
                 )
         return str.__new__(cls, dev_str)
 
@@ -227,7 +227,7 @@ class Shape:
         pattern = r"\d+(?:,\s*\d+)*"
         shape_repr = re.findall(pattern, self._shape.__str__())
         shape_repr = ", ".join([str(i) for i in shape_repr])
-        shape_repr = shape_repr + "," if len(shape_repr) == 1 else shape_repr
+        shape_repr = f"{shape_repr}," if len(shape_repr) == 1 else shape_repr
         return (
             f"ivy.Shape({shape_repr})" if self._shape is not None else "ivy.Shape(None)"
         )
@@ -279,10 +279,7 @@ class Shape:
         return (self._shape,)
 
     def as_dimension(self, other):
-        if isinstance(other, self._shape):
-            return other
-        else:
-            return self._shape
+        return other if isinstance(other, self._shape) else self._shape
 
     def __sub__(self, other):
         try:
@@ -307,9 +304,7 @@ class Shape:
             res = self._shape.__int__()
         else:
             res = int(self._shape)
-        if res is NotImplemented:
-            return res
-        return to_ivy(res)
+        return res if res is NotImplemented else to_ivy(res)
 
     def __ge__(self, other):
         self._shape = Shape._shape_casting_helper(self._shape, other)
@@ -388,20 +383,14 @@ class Shape:
 
     def index(self, index):
         assert isinstance(self._shape, Shape)
-        if self._shape.rank is None:
-            return Shape(None)
-        else:
-            return self._shape[index]
+        return Shape(None) if self._shape.rank is None else self._shape[index]
 
     @property
     def shape(self):
         return self._shape
 
     def as_dimension(self):
-        if isinstance(self._shape, Shape):
-            return self._shape
-        else:
-            return Shape(self._shape)
+        return self._shape if isinstance(self._shape, Shape) else Shape(self._shape)
 
     def is_compatible_with(self, other):
         return self._shape is None or other.value is None or self._shape == other.value
@@ -409,28 +398,23 @@ class Shape:
     @property
     def rank(self):
         """Returns the rank of this shape, or None if it is unspecified."""
-        if self._shape is not None:
-            return len(self._shape)
-        return None
+        return len(self._shape) if self._shape is not None else None
 
     def assert_same_rank(self, other):
         other = Shape(other)
         if self.rank != other.rank:
-            raise ValueError("Shapes %s and %s must have the same rank" % (self, other))
+            raise ValueError(f"Shapes {self} and {other} must have the same rank")
 
     def assert_has_rank(self, rank):
         if self.rank not in (None, rank):
             raise ValueError("Shape %s must have rank %d" % (self, rank))
 
-    def unknown_shape(rank=None, **kwargs):
-        if rank is None and "ndims" in kwargs:
-            rank = kwargs.pop("ndims")
+    def unknown_shape(self, **kwargs):
+        if self is None and "ndims" in kwargs:
+            self = kwargs.pop("ndims")
         if kwargs:
-            raise TypeError("Unknown argument: %s" % kwargs)
-        if rank is None:
-            return Shape(None)
-        else:
-            return Shape([Shape(None)] * rank)
+            raise TypeError(f"Unknown argument: {kwargs}")
+        return Shape(None) if self is None else Shape([Shape(None)] * self)
 
     def with_rank(self, rank):
         try:
@@ -450,11 +434,8 @@ class Shape:
         else:
             return self
 
-    def as_shape(shape):
-        if isinstance(shape, Shape):
-            return shape
-        else:
-            return Shape(shape)
+    def as_shape(self):
+        return self if isinstance(self, Shape) else Shape(self)
 
     @property
     def dims(self):
@@ -482,14 +463,14 @@ class Shape:
     @property
     def assert_is_fully_defined(self):
         if not self.is_fully_defined():
-            raise ValueError("Shape %s is not fully defined" % self)
+            raise ValueError(f"Shape {self} is not fully defined")
 
     def as_list(self):
         if self._shape is None:
             raise ivy.utils.exceptions.IvyException(
                 "Cannot convert a partially known Shape to a list"
             )
-        return [dim for dim in self._shape]
+        return list(self._shape)
 
 
 class IntDtype(Dtype):
@@ -577,11 +558,11 @@ class Node(str):
     pass
 
 
-array_significant_figures_stack = list()
-array_decimal_values_stack = list()
-warning_level_stack = list()
-nan_policy_stack = list()
-dynamic_backend_stack = list()
+array_significant_figures_stack = []
+array_decimal_values_stack = []
+warning_level_stack = []
+nan_policy_stack = []
+dynamic_backend_stack = []
 warn_to_regex = {"all": "!.*", "ivy_only": "^(?!.*ivy).*$", "none": ".*"}
 
 
@@ -1381,11 +1362,11 @@ extra_promotion_table = {
 }
 
 # TODO: change when it's not the default mode anymore
-promotion_table = {
-    **array_api_promotion_table,
-    **common_extra_promotion_table,
-    **precise_extra_promotion_table,
-}
+promotion_table = (
+    array_api_promotion_table
+    | common_extra_promotion_table
+    | precise_extra_promotion_table
+)
 
 
 # global parameter properties
@@ -1431,8 +1412,7 @@ class IvyWithGlobalProps(sys.modules[__name__].__class__):
         internal = internal and _is_from_internal(filename)
         if not internal and name in GLOBAL_PROPS:
             raise ivy.utils.exceptions.IvyException(
-                "Property: {} is read only! Please use the setter: set_{}() for setting"
-                " its value!".format(name, name)
+                f"Property: {name} is read only! Please use the setter: set_{name}() for setting its value!"
             )
         self.__dict__[name] = value
 

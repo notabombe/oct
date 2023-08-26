@@ -8,7 +8,7 @@ class NestedArray(NestedArrayBase):
 
     @classmethod
     def from_row_lengths(cls, values, row_lengths):
-        ivy_arrays = list()
+        ivy_arrays = []
         for i in range(len(row_lengths)):
             ivy_arrays.append(values[: row_lengths[i]])
             values = values[row_lengths[i] :]
@@ -16,7 +16,7 @@ class NestedArray(NestedArrayBase):
 
     @classmethod
     def from_row_splits(cls, values, row_split):
-        row_lengths = list()
-        for i in range(1, len(row_split)):
-            row_lengths.append(row_split[i] - row_split[i - 1])
+        row_lengths = [
+            row_split[i] - row_split[i - 1] for i in range(1, len(row_split))
+        ]
         return cls.from_row_lengths(values, row_lengths)

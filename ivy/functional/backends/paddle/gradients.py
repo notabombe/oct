@@ -186,9 +186,7 @@ def stop_gradient(
 ):
     is_var = is_variable(x)
     x.stop_gradient = True
-    if is_var and preserve_type:
-        return variable(x)
-    return x
+    return variable(x) if is_var and preserve_type else x
 
 
 def _get_jac_one_arg_fn(grad_fn, xs, out_idx):

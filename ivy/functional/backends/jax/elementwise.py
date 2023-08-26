@@ -27,9 +27,7 @@ def abs(
         return x
     # jnp.where is used for consistent gradients
     ret = ivy.where(where, jnp.where(x != 0, jnp.absolute(x), 0), x)
-    if ivy.is_complex_dtype(x.dtype):
-        return ivy.real(ret)
-    return ret
+    return ivy.real(ret) if ivy.is_complex_dtype(x.dtype) else ret
 
 
 def acos(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
@@ -145,10 +143,7 @@ def bitwise_xor(
 
 @with_unsupported_dtypes({"0.4.13 and below": ("complex",)}, backend_version)
 def ceil(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
-    if "int" in str(x.dtype):
-        return x
-    else:
-        return jnp.ceil(x)
+    return x if "int" in str(x.dtype) else jnp.ceil(x)
 
 
 def cos(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
@@ -197,10 +192,7 @@ def expm1(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
 
 @with_unsupported_dtypes({"0.4.13 and below": ("complex",)}, backend_version)
 def floor(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
-    if "int" in str(x.dtype):
-        return x
-    else:
-        return jnp.floor(x)
+    return x if "int" in str(x.dtype) else jnp.floor(x)
 
 
 @with_unsupported_dtypes({"0.4.13 and below": ("complex",)}, backend_version)
@@ -437,13 +429,8 @@ def remainder(
 def round(
     x: JaxArray, /, *, decimals: int = 0, out: Optional[JaxArray] = None
 ) -> JaxArray:
-    if "int" in str(x.dtype):
-        ret = jnp.copy(x)
-    else:
-        ret = jnp.round(x, decimals=decimals)
-    if ivy.exists(out):
-        return ivy.inplace_update(out, ret)
-    return ret
+    ret = jnp.copy(x) if "int" in str(x.dtype) else jnp.round(x, decimals=decimals)
+    return ivy.inplace_update(out, ret) if ivy.exists(out) else ret
 
 
 def _abs_variant_sign(x):
@@ -512,10 +499,7 @@ def tanh(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
 
 @with_unsupported_dtypes({"0.4.13 and below": ("complex",)}, backend_version)
 def trunc(x: JaxArray, /, *, out: Optional[JaxArray] = None) -> JaxArray:
-    if "int" in str(x.dtype):
-        return x
-    else:
-        return jnp.trunc(x)
+    return x if "int" in str(x.dtype) else jnp.trunc(x)
 
 
 def exp2(
@@ -564,9 +548,7 @@ def maximum(
     out: Optional[JaxArray] = None,
 ) -> JaxArray:
     x1, x2 = ivy.promote_types_of_inputs(x1, x2)
-    if use_where:
-        return jnp.where(x1 >= x2, x1, x2)
-    return jnp.maximum(x1, x2)
+    return jnp.where(x1 >= x2, x1, x2) if use_where else jnp.maximum(x1, x2)
 
 
 def minimum(
@@ -578,9 +560,7 @@ def minimum(
     out: Optional[JaxArray] = None,
 ) -> JaxArray:
     x1, x2 = ivy.promote_types_of_inputs(x1, x2)
-    if use_where:
-        return jnp.where(x1 <= x2, x1, x2)
-    return jnp.minimum(x1, x2)
+    return jnp.where(x1 <= x2, x1, x2) if use_where else jnp.minimum(x1, x2)
 
 
 def reciprocal(

@@ -95,9 +95,7 @@ def max_pool1d(
 
     res = sub_matrices.max(axis=(2))
 
-    if data_format == "NCW":
-        return res.swapaxes(1, 2)
-    return res
+    return res.swapaxes(1, 2) if data_format == "NCW" else res
 
 
 def max_pool2d(
@@ -203,9 +201,7 @@ def max_pool2d(
 
     if depth_pooling:
         res = np.transpose(res, (0, 2, 3, 1))
-    if data_format == "NCHW":
-        return np.transpose(res, (0, 3, 1, 2))
-    return res
+    return np.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 def max_pool3d(
@@ -270,9 +266,7 @@ def max_pool3d(
 
     # B x OH x OW x O
     res = sub_matrices.max(axis=(4, 5, 6))
-    if data_format == "NCDHW":
-        return np.transpose(res, (0, 4, 1, 2, 3))
-    return res
+    return np.transpose(res, (0, 4, 1, 2, 3)) if data_format == "NCDHW" else res
 
 
 def _get_padded_values(x_shape, kernel, strides, padding, ceil_mode, dim):
@@ -376,9 +370,7 @@ def avg_pool1d(
             num_padded_values[-1] = c[0]
         res = (kernel[0] * res) / (kernel[0] - num_padded_values[:, None])
 
-    if data_format == "NCW":
-        return res.swapaxes(1, 2)
-    return res
+    return res.swapaxes(1, 2) if data_format == "NCW" else res
 
 
 def avg_pool2d(
@@ -483,9 +475,7 @@ def avg_pool2d(
         kernel_mul = np.prod(kernel)
         res = (kernel_mul * res) / (kernel_mul - np.expand_dims(num_padded_values, -1))
 
-    if data_format == "NCHW":
-        return np.transpose(res, (0, 3, 1, 2))
-    return res
+    return np.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 def avg_pool3d(
@@ -599,9 +589,7 @@ def avg_pool3d(
         )
         kernel_mul = np.prod(kernel)
         res = (kernel_mul * res) / (kernel_mul - np.expand_dims(num_padded_values, -1))
-    if data_format == "NCDHW":
-        return np.transpose(res, (0, 4, 1, 2, 3))
-    return res
+    return np.transpose(res, (0, 4, 1, 2, 3)) if data_format == "NCDHW" else res
 
 
 def fft(
@@ -632,7 +620,7 @@ def fft(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {n}, expecting more than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm not in ["backward", "ortho", "forward"]:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
     if x.dtype in [np.uint64, np.int64, np.float64, np.complex128]:
         out_dtype = np.complex128
@@ -655,7 +643,7 @@ def dct(
     if norm not in (None, "ortho"):
         raise ValueError("Norm must be either None or 'ortho'")
     if axis < 0:
-        axis = axis + len(x.shape)
+        axis += len(x.shape)
     if n is not None:
         signal_len = x.shape[axis]
         if n <= signal_len:
@@ -669,7 +657,7 @@ def dct(
     real_zero = np.array(0.0, dtype=x.dtype)
     axis_dim = x.shape[axis]
     axis_dim_float = np.array(axis_dim, dtype=x.dtype)
-    cast_final = True if x.dtype != np.float64 else False
+    cast_final = x.dtype != np.float64
 
     if type == 1:
         if norm:
@@ -762,8 +750,8 @@ def dropout1d(
 ) -> np.ndarray:
     if training:
         x_shape = x.shape
-        is_batched = len(x_shape) == 3
         if data_format == "NCW":
+            is_batched = len(x_shape) == 3
             perm = (0, 2, 1) if is_batched else (1, 0)
             x = np.transpose(x, perm)
             x_shape = x.shape
@@ -855,9 +843,10 @@ def ifft(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {n}, expecting more than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm in {"backward", "ortho", "forward"}:
+        return np.asarray(np.fft.ifft(x, n, dim, norm), dtype=x.dtype)
+    else:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
-    return np.asarray(np.fft.ifft(x, n, dim, norm), dtype=x.dtype)
 
 
 def fft2(
@@ -887,9 +876,10 @@ def fft2(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {s}, expecting s points larger than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm in {"backward", "ortho", "forward"}:
+        return np.fft.fft2(x, s, dim, norm).astype(np.complex128)
+    else:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
-    return np.fft.fft2(x, s, dim, norm).astype(np.complex128)
 
 
 def ifftn(

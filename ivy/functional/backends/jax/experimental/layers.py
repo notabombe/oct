@@ -23,9 +23,9 @@ def _determine_depth_max_pooling(x, kernel, strides, dims):
     # determine depth pooling
     depth_pooling = False
     if len(kernel) == dims + 2:
-        spatial_kernel = kernel[1:-1]
         if kernel[-1] != 1:
             depth_pooling = True
+            spatial_kernel = kernel[1:-1]
             if any(jnp.array(spatial_kernel) != 1):
                 raise NotImplementedError(
                     "MaxPooling supports exactly one of pooling across"
@@ -114,10 +114,8 @@ def general_pool(
 
     # shape of window after dilation
     new_window_shape = tuple(
-        [
-            window_shape[i - 1] + (dilation[i] - 1) * (window_shape[i - 1] - 1)
-            for i in range(1, len(dims) - 1)
-        ]
+        window_shape[i - 1] + (dilation[i] - 1) * (window_shape[i - 1] - 1)
+        for i in range(1, len(dims) - 1)
     )
     inputs, window_shape, strides, depth_pooling = _determine_depth_max_pooling(
         inputs, window_shape, strides, 2
@@ -235,10 +233,7 @@ def max_pool2d(
         x, -jnp.inf, jlax.max, kernel, strides, padding, 2, dilation, ceil_mode
     )
 
-    if data_format == "NCHW":
-        return jnp.transpose(res, (0, 3, 1, 2))
-
-    return res
+    return jnp.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 def max_pool3d(
@@ -357,9 +352,7 @@ def avg_pool2d(
             ceil_mode=ceil_mode,
         )
     res = res / divisor
-    if data_format == "NCHW":
-        return jnp.transpose(res, (0, 3, 1, 2))
-    return res
+    return jnp.transpose(res, (0, 3, 1, 2)) if data_format == "NCHW" else res
 
 
 def avg_pool3d(
@@ -428,7 +421,7 @@ def dct(
     if norm not in (None, "ortho"):
         raise ValueError("Norm must be either None or 'ortho'")
     if axis < 0:
-        axis = axis + len(x.shape)
+        axis += len(x.shape)
     if n is not None:
         signal_len = x.shape[axis]
         if n <= signal_len:
@@ -449,13 +442,9 @@ def dct(
         axis_idx = [slice(None)] * len(x.shape)
         axis_idx[axis] = slice(-2, 0, -1)
         x = jnp.concatenate([x, x[tuple(axis_idx)]], axis=axis)
-        dct_out = jnp.real(jnp.fft.rfft(x, axis=axis))
-        return dct_out
-
+        return jnp.real(jnp.fft.rfft(x, axis=axis))
     elif type == 2:
-        dct_out = jax.scipy.fft.dct(x, type=2, n=n, axis=axis, norm=norm)
-        return dct_out
-
+        return jax.scipy.fft.dct(x, type=2, n=n, axis=axis, norm=norm)
     elif type == 3:
         scale_dims = [1] * len(x.shape)
         scale_dims[axis] = axis_dim
@@ -474,11 +463,11 @@ def dct(
 
         axis_idx = [slice(None)] * len(x.shape)
         axis_idx[axis] = slice(None, axis_dim)
-        dct_out = jnp.real(
-            jnp.fft.irfft(scale * jlax.complex(x, real_zero), n=2 * axis_dim, axis=axis)
+        return jnp.real(
+            jnp.fft.irfft(
+                scale * jlax.complex(x, real_zero), n=2 * axis_dim, axis=axis
+            )
         )[tuple(axis_idx)]
-        return dct_out
-
     elif type == 4:
         dct_2 = jax.scipy.fft.dct(x, type=2, n=2 * axis_dim, axis=axis, norm=None)
         axis_idx = [slice(None)] * len(x.shape)
@@ -531,9 +520,10 @@ def fft(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {n}, expecting more than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm in {"backward", "ortho", "forward"}:
+        return jnp.fft.fft(x, n, dim, norm)
+    else:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
-    return jnp.fft.fft(x, n, dim, norm)
 
 
 def dropout1d(
@@ -547,8 +537,8 @@ def dropout1d(
 ) -> JaxArray:
     if training:
         x_shape = x.shape
-        is_batched = len(x_shape) == 3
         if data_format == "NCW":
+            is_batched = len(x_shape) == 3
             perm = (0, 2, 1) if is_batched else (1, 0)
             x = jnp.transpose(x, perm)
             x_shape = x.shape
@@ -643,9 +633,10 @@ def ifft(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {n}, expecting more than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm in {"backward", "ortho", "forward"}:
+        return jnp.fft.ifft(x, n, dim, norm)
+    else:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
-    return jnp.fft.ifft(x, n, dim, norm)
 
 
 def interpolate(
@@ -762,9 +753,10 @@ def fft2(
         raise ivy.utils.exceptions.IvyError(
             f"Invalid data points {s}, expecting s points larger than 1"
         )
-    if norm != "backward" and norm != "ortho" and norm != "forward":
+    if norm in {"backward", "ortho", "forward"}:
+        return jnp.fft.fft2(x, s, dim, norm).astype(jnp.complex128)
+    else:
         raise ivy.utils.exceptions.IvyError(f"Unrecognized normalization mode {norm}")
-    return jnp.fft.fft2(x, s, dim, norm).astype(jnp.complex128)
 
 
 def ifftn(

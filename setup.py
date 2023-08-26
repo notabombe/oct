@@ -39,12 +39,12 @@ def _replace_logos_html(txt):
         "   :width: 100%\n"
         "   :class: dark-light"
     )
-    backends_chunk = "\n\n".join(bc[0:1] + [img_str] + bc[2:])
+    backends_chunk = "\n\n".join(bc[:1] + [img_str] + bc[2:])
 
     # re-join
     return "".join(
         [
-            ".. raw:: html".join(chunks[0:2]),
+            ".. raw:: html".join(chunks[:2]),
             backends_chunk,
             ".. raw:: html".join(chunks[3:]),
         ]
@@ -56,21 +56,17 @@ def _remove_dark_logo(txt):
 
 
 def _is_html(line):
-    line_squashed = line.replace(" ", "")
-    if not line_squashed:
+    if line_squashed := line.replace(" ", ""):
+        return line_squashed[0] == "<" and line_squashed[-1] == ">"
+    else:
         return False
-    if line_squashed[0] == "<" and line_squashed[-1] == ">":
-        return True
-    return False
 
 
 def _is_raw_block(line):
     line_squashed = line.replace(" ", "")
     if len(line_squashed) < 11:
         return False
-    if line_squashed[-11:] == "..raw::html":
-        return True
-    return False
+    return line_squashed[-11:] == "..raw::html"
 
 
 def read_description(path):

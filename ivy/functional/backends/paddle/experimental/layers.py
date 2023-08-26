@@ -102,11 +102,11 @@ def max_pool2d(
 
     if data_format == "NHWC":
         x = paddle.transpose(x, perm=[0, 3, 1, 2])
-    x_shape = list(x.shape[2:])
-
     new_kernel = [kernel[i] + (kernel[i] - 1) * (dilation[i] - 1) for i in range(2)]
 
     if isinstance(padding, str):
+        x_shape = list(x.shape[2:])
+
         pad_h = _handle_padding(x_shape[0], strides[0], new_kernel[0], padding)
         pad_w = _handle_padding(x_shape[1], strides[1], new_kernel[1], padding)
         pad_list = [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2]
@@ -166,7 +166,7 @@ def max_pool3d(
         value=float("-inf"),
         data_format="NDHWC",
     )
-    if padding != "VALID" and padding != "SAME":
+    if padding not in ["VALID", "SAME"]:
         raise ValueError(
             f'Invalid padding arg {padding}\nMust be one of: "VALID" or "SAME"'
         )

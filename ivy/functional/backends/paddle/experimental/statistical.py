@@ -39,16 +39,20 @@ def median(
     # only axis in the tensor so it needs to be handled manually
 
     ret_dtype = input.dtype
-    if input.dtype not in [paddle.int32, paddle.int64, paddle.float32, paddle.float64]:
-        if paddle.is_complex(input):
-            ret = paddle.complex(
-                paddle.median(input.real(), axis=axis, keepdim=True),
-                paddle.median(input.imag(), axis=axis, keepdim=True),
-            )
-        else:
-            ret = paddle.median(input.cast("float32"), axis=axis, keepdim=True)
-    else:
+    if input.dtype in [
+        paddle.int32,
+        paddle.int64,
+        paddle.float32,
+        paddle.float64,
+    ]:
         ret = paddle.median(input, axis=axis, keepdim=True)
+    elif paddle.is_complex(input):
+        ret = paddle.complex(
+            paddle.median(input.real(), axis=axis, keepdim=True),
+            paddle.median(input.imag(), axis=axis, keepdim=True),
+        )
+    else:
+        ret = paddle.median(input.cast("float32"), axis=axis, keepdim=True)
     if not keepdims:
         ret = paddle_backend.squeeze(ret, axis=axis)
     # The following code is to simulate other frameworks
@@ -74,17 +78,16 @@ def nanmean(
     a = a.cast(
         ret_dtype
     )  # this is necessary to match other FWs behaviour which cast before calculation
-    if a.dtype not in [paddle.int64, paddle.float32, paddle.float64]:
-        if paddle.is_complex(a):
-            ret = paddle.complex(
-                paddle.nanmean(a.real(), axis=axis, keepdim=keepdims),
-                paddle.nanmean(a.imag(), axis=axis, keepdim=keepdims),
-            )
-        else:
-            ret = paddle.nanmean(a.cast("float32"), axis=axis, keepdim=keepdims)
-    else:
+    if a.dtype in [paddle.int64, paddle.float32, paddle.float64]:
         ret = paddle.nanmean(a, axis=axis, keepdim=keepdims)
 
+    elif paddle.is_complex(a):
+        ret = paddle.complex(
+            paddle.nanmean(a.real(), axis=axis, keepdim=keepdims),
+            paddle.nanmean(a.imag(), axis=axis, keepdim=keepdims),
+        )
+    else:
+        ret = paddle.nanmean(a.cast("float32"), axis=axis, keepdim=keepdims)
     # The following code is to simulate other frameworks
     # output shapes behaviour since min output dim is 1 in paddle
     if isinstance(axis, Sequence):
@@ -113,43 +116,43 @@ def _compute_quantile(
     else:
         raise TypeError("Type of q should be int, float, list or tuple.")
 
-    # Validate axis
-    dims = len(x.shape)
     out_shape = list(x.shape)
+    dims = len(x.shape)
     if axis is None:
         x = paddle_backend.flatten(x)
         axis = 0
         out_shape = [1] * dims
-    else:
-        if isinstance(axis, (list, tuple)):
-            if len(axis) <= 0:
-                raise ValueError("axis should not be empty")
-            axis_src, axis_dst = [], []
-            for axis_single in axis:
-                if not isinstance(axis_single, int) or not (
-                    axis_single < dims and axis_single >= -dims
-                ):
-                    raise ValueError(
-                        "Axis should be None, int, or a list, element should in "
-                        "range [-rank(x), rank(x))."
-                    )
-                if axis_single < 0:
-                    axis_single = axis_single + dims
-                axis_src.append(axis_single)
-                out_shape[axis_single] = 1
-            axis_dst = list(range(-len(axis), 0))
-            x = paddle_backend.moveaxis(x, axis_src, axis_dst)
-            x = paddle_backend.flatten(x, axis_dst[0], axis_dst[-1])
-            axis = axis_dst[0]
-        else:
-            if not isinstance(axis, int) or not (axis < dims and axis >= -dims):
+    elif isinstance(axis, (list, tuple)):
+        if len(axis) <= 0:
+            raise ValueError("axis should not be empty")
+        axis_src, axis_dst = [], []
+        for axis_single in axis:
+            if (
+                not isinstance(axis_single, int)
+                or axis_single >= dims
+                or axis_single < -dims
+            ):
                 raise ValueError(
                     "Axis should be None, int, or a list, element should in "
                     "range [-rank(x), rank(x))."
                 )
-            if axis < 0:
-                axis += dims
-            out_shape[axis] = 1
+            if axis_single < 0:
+                axis_single = axis_single + dims
+            axis_src.append(axis_single)
+            out_shape[axis_single] = 1
+        axis_dst = list(range(-len(axis), 0))
+        x = paddle_backend.moveaxis(x, axis_src, axis_dst)
+        x = paddle_backend.flatten(x, axis_dst[0], axis_dst[-1])
+        axis = axis_dst[0]
+    else:
+        if not isinstance(axis, int) or axis >= dims or axis < -dims:
+            raise ValueError(
+                "Axis should be None, int, or a list, element should in "
+                "range [-rank(x), rank(x))."
+            )
+        if axis < 0:
+            axis += dims
+        out_shape[axis] = 1
 
     mask = paddle_backend.isnan(x)
     valid_counts = paddle_backend.sum(
@@ -172,8 +175,6 @@ def _compute_quantile(
             index = paddle_backend.where(mask.any(axis=axis, keepdim=True), nums, index)
             indices.append(index)
     sorted_tensor = paddle.sort(x, axis)
-
-    outputs = []
 
     for index in indices:
         if interpolation not in ["linear", "lower", "higher", "midpoint", "nearest"]:
@@ -202,17 +203,9 @@ def _compute_quantile(
             tensor_upper.astype("float64"),
             weights,
         )
-    if not keepdim:
-        out = paddle.squeeze(out, axis=axis)
-    else:
-        out = out.reshape(out_shape)
-    outputs.append(out)
-
-    if len(q) > 1:
-        outputs = paddle.stack(outputs, 0)
-    else:
-        outputs = outputs[0]
-
+    out = paddle.squeeze(out, axis=axis) if not keepdim else out.reshape(out_shape)
+    outputs = [out]
+    outputs = paddle.stack(outputs, 0) if len(q) > 1 else outputs[0]
     return outputs.astype(ret_dtype)
 
 
@@ -420,11 +413,7 @@ def cov(
             raise ValueError("x2 has more than 2 dimensions")
 
     if ddof is None:
-        if bias == 0:
-            ddof = 1
-        else:
-            ddof = 0
-
+        ddof = 1 if bias == 0 else 0
     if dtype is None:
         x1 = x1.astype("float64")
         if x2 is not None:
@@ -509,10 +498,7 @@ def __find_cummax(
     if (
         isinstance(x.tolist()[0], list)
         and len(x[0].shape) >= 1
-        and (
-            (type(x[0]) == paddle.Tensor)
-            or (type(x[0]) == ivy.data_classes.array.array.Array)
-        )
+        and type(x[0]) in [paddle.Tensor, ivy.data_classes.array.array.Array]
     ):
         if axis >= 1:
             if not isinstance(x, list):
@@ -557,7 +543,7 @@ def __find_cummax(
         for idx, y in enumerate(x):
             if x[n] > y:
                 values.append(x[n])
-            elif x[n] <= y or idx == 0:
+            else:
                 n = idx
                 values.append(y)
             indices.append(n)
@@ -603,8 +589,7 @@ def cummin(
     if reverse:
         x = paddle.flip(x, axis=[axis])
     x_unstacked = paddle.unbind(x, axis=axis)
-    cummin_x_unstacked = []
-    cummin_x_unstacked.append(x_unstacked[0])
+    cummin_x_unstacked = [x_unstacked[0]]
     for i, x_sub in enumerate(x_unstacked[1:]):
         cummin_x_sub = paddle.minimum(cummin_x_unstacked[i], x_sub)
         cummin_x_unstacked.append(cummin_x_sub)

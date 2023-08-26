@@ -36,8 +36,7 @@ class NestedArrayBase(abc.ABC):
             data = data._data
         else:
             raise TypeError(
-                "Input data must be ivy.Array, ivy.NativeArray"
-                " or a list of either, got: {}".format(type(data))
+                f"Input data must be ivy.Array, ivy.NativeArray or a list of either, got: {type(data)}"
             )
         for i in range(len(data)):
             data[i] = ivy.astype(data[i], dtype)
@@ -48,8 +47,8 @@ class NestedArrayBase(abc.ABC):
         self,
     ):
         final_shape = [len(self._data)]
-        shapes = list()
-        ndims = list()
+        shapes = []
+        ndims = []
         for arr in self._data:
             shapes.append(arr.shape)
             ndims.append(arr.ndim)
@@ -58,12 +57,8 @@ class NestedArrayBase(abc.ABC):
                 "All arrays in a nested array must have the same number of dimensions."
             )
         for i in range(ndims[0]):
-            same_shape = True
             current_shape = shapes[0][i]
-            for j in range(final_shape[0]):
-                if shapes[j][i] != current_shape:
-                    same_shape = False
-                    break
+            same_shape = all(shapes[j][i] == current_shape for j in range(final_shape[0]))
             if same_shape:
                 final_shape.append(current_shape)
             else:
@@ -82,9 +77,9 @@ class NestedArrayBase(abc.ABC):
         arg_nest = ivy.multi_index_nest(args, arg_nest_idxs)
         kwarg_nest = ivy.multi_index_nest(kwargs, kwarg_nest_idxs)
         num_nest = len(arg_nest) + len(kwarg_nest)
-        fn = ivy.__dict__[fn_name]
-
         if num_nest == 1:
+            fn = ivy.__dict__[fn_name]
+
             return ivy.nested_map(
                 fn,
             )
@@ -95,7 +90,7 @@ class NestedArrayBase(abc.ABC):
     def reshape(self, shape):
         assert shape[0] == self._shape[0], "batch dimension is not changeable"
         for i in range(0, shape[0]):
-            new_shape = list()
+            new_shape = []
             for j in range(1, len(shape)):
                 if shape[j] == -1:
                     new_shape.append(self._data[i].shape[j - 1])

@@ -85,9 +85,7 @@ def count_nonzero(
     if isinstance(axis, list):
         axis = tuple(axis)
     ret = np.count_nonzero(a, axis=axis, keepdims=keepdims)
-    if np.isscalar(ret):
-        return np.array(ret, dtype=dtype)
-    return ret.astype(dtype)
+    return np.array(ret, dtype=dtype) if np.isscalar(ret) else ret.astype(dtype)
 
 
 count_nonzero.support_native_out = False
@@ -121,9 +119,7 @@ def isclose(
     out: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     ret = np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=equal_nan)
-    if np.isscalar(ret):
-        return np.array(ret, dtype="bool")
-    return ret
+    return np.array(ret, dtype="bool") if np.isscalar(ret) else ret
 
 
 isclose.support_native_out = False
@@ -255,10 +251,7 @@ def xlogy(
     x: np.ndarray, y: np.ndarray, /, *, out: Optional[np.ndarray] = None
 ) -> np.ndarray:
     x, y = promote_types_of_inputs(x, y)
-    if (x == 0).all():
-        return 0.0
-    else:
-        return x * np.log(y)
+    return 0.0 if (x == 0).all() else x * np.log(y)
 
 
 def conj(
@@ -283,10 +276,7 @@ def ldexp(
 def frexp(
     x: np.ndarray, /, *, out: Optional[Tuple[np.ndarray, np.ndarray]] = None
 ) -> Tuple[np.ndarray, np.ndarray]:
-    if out is None:
-        return np.frexp(x, out=(None, None))
-    else:
-        return np.frexp(x, out=out)
+    return np.frexp(x, out=(None, None)) if out is None else np.frexp(x, out=out)
 
 
 def modf(
